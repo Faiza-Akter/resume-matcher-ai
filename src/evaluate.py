@@ -9,9 +9,6 @@ from sklearn.metrics import (
 
 
 def compute_metrics(y_true, y_pred):
-    """
-    Compute all important AI evaluation metrics.
-    """
     acc = accuracy_score(y_true, y_pred)
     prec = precision_score(y_true, y_pred, zero_division=0)
     rec = recall_score(y_true, y_pred, zero_division=0)
@@ -24,16 +21,11 @@ def compute_metrics(y_true, y_pred):
         "recall": rec,
         "f1_score": f1,
         "confusion_matrix": cm.tolist(),
-        "classification_report": classification_report(
-            y_true, y_pred, zero_division=0
-        ),
+        "classification_report": classification_report(y_true, y_pred, zero_division=0),
     }
 
 
 def metrics_to_dict(metrics):
-    """
-    Convert metrics for saving into JSON.
-    """
     return {
         "accuracy": round(metrics["accuracy"] * 100, 2),
         "precision": round(metrics["precision"] * 100, 2),

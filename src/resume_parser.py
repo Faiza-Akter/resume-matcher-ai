@@ -8,7 +8,6 @@ from .utils import normalize_whitespace
 
 
 def read_txt(file_bytes: bytes) -> str:
-    """Reads text from a .txt file."""
     try:
         return normalize_whitespace(file_bytes.decode("utf-8", errors="ignore"))
     except Exception:
@@ -16,7 +15,6 @@ def read_txt(file_bytes: bytes) -> str:
 
 
 def read_docx(file_bytes: bytes) -> str:
-    """Extracts text from .docx resumes."""
     try:
         f = io.BytesIO(file_bytes)
         document = docx.Document(f)
@@ -27,7 +25,6 @@ def read_docx(file_bytes: bytes) -> str:
 
 
 def read_pdf(file_bytes: bytes) -> str:
-    """Extracts text from PDF resumes using pdfplumber."""
     try:
         f = io.BytesIO(file_bytes)
         text_parts = []
@@ -42,7 +39,6 @@ def read_pdf(file_bytes: bytes) -> str:
 
 
 def extract_text(filename: str, file_bytes: bytes) -> str:
-    """Detect file extension and extract text accordingly."""
     ext = Path(filename).suffix.lower()
 
     if ext == ".pdf":
@@ -50,5 +46,4 @@ def extract_text(filename: str, file_bytes: bytes) -> str:
     if ext == ".docx":
         return read_docx(file_bytes)
 
-    # treat .txt and unknown formats as text
     return read_txt(file_bytes)
