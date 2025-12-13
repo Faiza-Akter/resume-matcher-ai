@@ -1,11 +1,12 @@
 from dataclasses import dataclass
 from pathlib import Path
 
+
 @dataclass(frozen=True)
 class AppConfig:
     # Directory to store trained ML artifacts
     model_dir: Path = Path("models")
-    
+
     # Paths for saving vectorizer & classifier
     vectorizer_path: Path = Path("models/vectorizer.joblib")
     classifier_path: Path = Path("models/classifier.joblib")
@@ -24,5 +25,6 @@ class AppConfig:
     # TF-IDF settings
     max_features: int = 40000
     ngram_range: tuple = (1, 2)
+
 
 CONFIG = AppConfig()
