@@ -9,7 +9,7 @@ from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
 
 from src.config import CONFIG
-from src.preprocess import clean_text
+from src.preprocess import build_pair_text, clean_text
 from src.resume_parser import extract_text
 
 
@@ -192,6 +192,33 @@ st.markdown(
         filter: brightness(0.98);
     }}
 
+    /* -------------------------
+       RESULT TABLE HEADER COLORS
+       Header background: #0b1678
+       Header text: #8d97c1
+    ------------------------- */
+    [data-testid="stDataFrame"] thead tr th {{
+        background: #0b1678 !important;
+        color: #8d97c1 !important;
+        font-weight: 900 !important;
+        border-bottom: 1px solid rgba(255,255,255,0.22) !important;
+    }}
+    [data-testid="stDataFrame"] thead tr th:first-child {{
+        background: #0b1678 !important;
+        color: #8d97c1 !important;
+    }}
+    [data-testid="stDataFrame"] tbody tr td {{
+        background: rgba(255,255,255,0.92) !important;
+        color: #0b1678 !important;
+        border-bottom: 1px solid rgba(11,22,120,0.08) !important;
+    }}
+    [data-testid="stDataFrame"] {{
+        border-radius: 14px;
+        overflow: hidden;
+        border: 1px solid rgba(255,255,255,0.22);
+        box-shadow: 0 12px 26px rgba(0,0,0,0.10);
+    }}
+
     </style>
     """,
     unsafe_allow_html=True,
@@ -222,6 +249,27 @@ def load_model_artifacts():
 
 
 vectorizer, classifier, metrics = load_model_artifacts()
+
+
+# -------------------------
+# ML Probability (Classifier)
+# -------------------------
+def compute_ml_probability(job_text: str, resume_text: str) -> float | None:
+    """
+    Returns probability of class 1 (match) from the trained model.
+    If model is not available, returns None.
+    """
+    if vectorizer is None or classifier is None:
+        return None
+
+    combined = build_pair_text(job_text, resume_text)
+    X = vectorizer.transform([combined])
+
+    if hasattr(classifier, "predict_proba"):
+        return float(classifier.predict_proba(X)[0][1])
+
+    pred = int(classifier.predict(X)[0])
+    return 1.0 if pred == 1 else 0.0
 
 
 # -------------------------
@@ -348,10 +396,18 @@ if match_clicked:
     sims_percent = [s * 100.0 for s in sims]
 
     rows = []
-    for name, sim_p in zip(resume_names, sims_percent):
-        rows.append({"Resume": name, "Category": similarity_category(sim_p), "_sim": sim_p})
+    for name, raw_text, sim_p in zip(resume_names, resume_texts, sims_percent):
+        ml_prob = compute_ml_probability(job_description, raw_text)
+        prob_percent = round(ml_prob * 100.0, 2) if ml_prob is not None else None
+
+        rows.append({
+            "Resume": name,
+            "Category": similarity_category(sim_p),
+            "Probability(%)": prob_percent,
+            "_sim": sim_p,
+        })
 
     df = pd.DataFrame(rows).sort_values("_sim", ascending=False).reset_index(drop=True)
 
     st.subheader("📌 Match Results (Ranked)")
-    st.dataframe(df[["Resume", "Category"]], use_container_width=True)
+    st.dataframe(df[["Resume", "Category", "Probability(%)"]], use_container_width=True)
