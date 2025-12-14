@@ -5,7 +5,6 @@ from .config import CONFIG
 from .utils import safe_str
 from .preprocess import build_pair_text
 
-# Column name candidates for auto-detection
 TEXT_COL_CANDIDATES = {
     "resume": [
         "resume", "resume_text", "Resume", "ResumeText",
@@ -24,12 +23,10 @@ SCORE_COL_CANDIDATES = ["score", "match_score", "similarity", "rating"]
 def _find_col(df: pd.DataFrame, candidates) -> Optional[str]:
     cols = set(df.columns)
 
-    # Case-sensitive match
     for c in candidates:
         if c in cols:
             return c
 
-    # Case-insensitive match
     lower_map = {x.lower(): x for x in df.columns}
     for c in candidates:
         if c.lower() in lower_map:
@@ -39,22 +36,6 @@ def _find_col(df: pd.DataFrame, candidates) -> Optional[str]:
 
 
 def load_hf_dataframe(dataset_name: str = CONFIG.hf_dataset_name) -> pd.DataFrame:
-    """
-    Robust loader for netsol/resume-score-details.
-
-    IMPORTANT:
-    Hugging Face `datasets.load_dataset()` fails for this dataset due to inconsistent
-    nested struct/dict keys across JSON files (Arrow schema cast errors).
-
-    So we:
-    - list all .json files in the dataset repo
-    - download them one by one
-    - parse only the text fields we need: job_description + resume
-    - create a binary label from filename:
-        * contains "mismatch" or "mismatched" -> 0
-        * contains "match" (and not mismatch) -> 1
-        * contains "invalid" -> skip
-    """
     import json
     from huggingface_hub import list_repo_files, hf_hub_download
 
@@ -70,11 +51,9 @@ def load_hf_dataframe(dataset_name: str = CONFIG.hf_dataset_name) -> pd.DataFram
     for i, fname in enumerate(json_files, start=1):
         low = fname.lower()
 
-        # Skip invalid samples
         if "invalid" in low:
             continue
 
-        # Infer label from filename
         if "mismatch" in low or "mismatched" in low:
             label = 0
         elif "match" in low:
@@ -82,37 +61,27 @@ def load_hf_dataframe(dataset_name: str = CONFIG.hf_dataset_name) -> pd.DataFram
         else:
             continue
 
-        # Progress print every 50 files
         if i % 50 == 0:
             print(f"[HF] Processed {i}/{total} files...")
 
-        local_path = hf_hub_download(
-            repo_id=repo_id,
-            repo_type="dataset",
-            filename=fname
-        )
-
+        local_path = hf_hub_download(repo_id=repo_id, repo_type="dataset", filename=fname)
         with open(local_path, "r", encoding="utf-8") as f:
             obj = json.load(f)
 
         inp = obj.get("input", {}) if isinstance(obj, dict) else {}
-        job_text = inp.get("job_description", "")
-        resume_text = inp.get("resume", "")
+        job_text = safe_str(inp.get("job_description", ""))
+        resume_text = safe_str(inp.get("resume", ""))
 
         rows.append({
-            "job_description": safe_str(job_text),
-            "resume": safe_str(resume_text),
+            "job_description": job_text,
+            "resume": resume_text,
             "label": int(label),
             "source_file": fname,
         })
 
     df = pd.DataFrame(rows)
-
     if df.empty:
-        raise ValueError(
-            "No usable rows were parsed from the dataset. "
-            "Check repo files or adjust filename labeling rules in src/data.py."
-        )
+        raise ValueError("No usable rows parsed from the dataset. Check labeling rules in src/data.py.")
 
     print(f"[HF] Final dataframe shape: {df.shape}")
     return df
@@ -136,12 +105,6 @@ def build_xy(
     df: pd.DataFrame,
     score_threshold: float = CONFIG.default_score_threshold
 ) -> Tuple[pd.Series, pd.Series, Dict[str, Any]]:
-    """
-    Returns:
-        X_text: Combined (job + resume) cleaned text
-        y: Labels (0/1)
-        info: metadata about dataset and column mappings
-    """
     schema = detect_schema(df)
     resume_col = schema["resume_col"]
     job_col = schema["job_col"]
@@ -150,8 +113,8 @@ def build_xy(
 
     if not resume_col or not job_col:
         raise ValueError(
-            f"Could not auto-detect resume/job columns. Found schema={schema}.\n"
-            f"Please adjust TEXT_COL_CANDIDATES in src/data.py."
+            f"Could not auto-detect resume/job columns. Found schema={schema}. "
+            f"Adjust TEXT_COL_CANDIDATES in src/data.py."
         )
 
     job_texts = df[job_col].map(safe_str)

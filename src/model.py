@@ -11,28 +11,14 @@ from .evaluate import compute_metrics, metrics_to_dict
 
 
 def train_and_save(score_threshold: float = CONFIG.default_score_threshold) -> dict:
-    """
-    Train the AI Resume Matcher using:
-    - TF-IDF vectorizer
-    - Logistic Regression classifier
-
-    Saves:
-    - vectorizer.joblib
-    - classifier.joblib
-    - label_info.json (dataset schema + metrics)
-    """
     print("\nLoading dataset from HuggingFace...")
     df = load_hf_dataframe(CONFIG.hf_dataset_name)
 
     print("Building training features...")
     X, y, info = build_xy(df, score_threshold=score_threshold)
 
-    # Safety: ensure there are 2 classes for training
     if y.nunique() < 2:
-        raise ValueError(
-            "Labeling produced only one class (all 0s or all 1s). "
-            "Check filename labeling rules in src/data.py."
-        )
+        raise ValueError("Labeling produced only one class. Check dataset labeling rules.")
 
     print("Splitting training/testing set...")
     X_train, X_test, y_train, y_test = train_test_split(
@@ -94,7 +80,7 @@ def main():
     if args.train:
         train_and_save(score_threshold=args.threshold)
     else:
-        print("Nothing to do. Use:\n  py -m src.model --train\nTip: use unbuffered output:\n  py -u -m src.model --train")
+        print("Nothing to do. Use:\n  py -u -m src.model --train")
 
 
 if __name__ == "__main__":
